@@ -950,6 +950,16 @@ sbom variant="base":
                 --spdx-namespace "https://github.com/projectbluefin/fsdk-containers/sbom/${GIT_SHA}/${SPDX_NAME}" \
                 --spdx-creator "Tool: buildstream-sbom" \
                 --spdx-creator "Organization: projectbluefin" \
+                # ponytail: FSDK provenance is injected as a label at Podman
+                # export (Justfile:302-303) but the graph SBOM never carried it,
+                # so the signed SBOM asserted provenance without evidencing it
+                # (#128). Encoding version/ref as SPDX creators puts the exact
+                # label strings into the signed document, so a consumer can verify
+                # the FSDK release and junction ref from the SBOM alone. Upgrade
+                # path: if a consumer needs richer provenance (per-component
+                # source refs, SLSA), move this into a dedicated SBOM field.
+                --spdx-creator "Organization: io.projectbluefin.fsdk.version={{fsdk_version}}" \
+                --spdx-creator "Organization: io.projectbluefin.fsdk.ref={{fsdk_ref}}" \
                 --deps all \
                 --output "/src/${OUTFILE}"
         '
@@ -996,6 +1006,14 @@ sboms:
                     --spdx-namespace "https://github.com/projectbluefin/fsdk-containers/sbom/${GIT_SHA}/${img}" \
                     --spdx-creator "Tool: buildstream-sbom" \
                     --spdx-creator "Organization: projectbluefin" \
+                    # FSDK provenance is injected as a label at Podman export
+                    # (Justfile:302-303) but the graph SBOM never carried it, so the
+                    # signed SBOM asserted provenance without evidencing it (#128).
+                    # Encoding version/ref as SPDX creators puts the exact label
+                    # strings into every image's signed document, so a consumer can
+                    # verify the FSDK release and junction ref from the SBOM alone.
+                    --spdx-creator "Organization: io.projectbluefin.fsdk.version={{fsdk_version}}" \
+                    --spdx-creator "Organization: io.projectbluefin.fsdk.ref={{fsdk_ref}}" \
                     --deps all \
                     --output "/src/${img}.spdx.json"
             done
