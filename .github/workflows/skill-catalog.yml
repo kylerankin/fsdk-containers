@@ -33,7 +33,7 @@ jobs:
           persist-credentials: false
 
       - name: Install python dependencies
-        run: python3 -m pip install --user pyyaml jsonschema
+        run: python3 -m pip install --user --require-hashes -r .github/requirements/verify.txt
 
       # Exercises the generator's guard rails: missing front matter, missing
       # required keys, an entry_point that disagrees with its own path, the
