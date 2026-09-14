@@ -47,10 +47,36 @@ jobs:
         run: |
           set -euo pipefail
           LIST="$(jq -r '[.oci_images[] | ., "\(.)-x86_64", "\(.)-aarch64"] | join(",")' elements/targets.json)"
-          echo "==> packages: ${LIST}"
-          echo "list=${LIST}" >> "$GITHUB_OUTPUT"
+          echo "==> candidate packages: ${LIST}"
+
+          # A target in the manifest that GHCR has not published yet (a
+          # brand-new image before its first fsdk-updated publish) makes the
+          # cleanup action's package lookup return HTTP 404 and fail the whole
+          # run. Only hand the action packages that actually exist, so an
+          # in-manifest-but-unpublished image is skipped instead of breaking a
+          # scheduled cleanup. Only a definitive "package not found" (404) skips
+          # a package; any other response -- including a scope error on a
+          # limited token -- keeps it, so cleanup never silently disables
+          # itself.
+          EXISTING=()
+          IFS=',' read -ra PKGS <<< "${LIST}"
+          for pkg in "${PKGS[@]}"; do
+            RESP="$(gh api "orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/${pkg}/versions" 2>&1)"
+            if printf '%s' "${RESP}" | grep -qi "package not found"; then
+              echo "== skipping unpublished package: ${pkg}"
+            else
+              EXISTING+=("${pkg}")
+            fi
+          done
+          FILTERED="$(printf '%s\n' "${EXISTING[@]}" | paste -sd, -)"
+          echo "==> cleaning: ${FILTERED}"
+          echo "list=${FILTERED}" >> "$GITHUB_OUTPUT"
 
       - name: Prune untagged images
+        # Skip the whole action when no candidate package exists on GHCR yet
+        # (e.g. the only unpublished target), so a run against a fresh manifest
+        # is a clean no-op instead of a 404 failure.
+        if: steps.packages.outputs.list != ''
         uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1
         with:
           packages: ${{ steps.packages.outputs.list }}
