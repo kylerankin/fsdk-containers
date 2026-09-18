@@ -44,6 +44,8 @@ jobs:
       # Derived from the canonical manifest, so a new image is covered the day
       # it is added instead of whenever someone remembers this file exists.
       - id: packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           LIST="$(jq -r '[.oci_images[] | ., "\(.)-x86_64", "\(.)-aarch64"] | join(",")' elements/targets.json)"
@@ -54,15 +56,27 @@ jobs:
           # cleanup action's package lookup return HTTP 404 and fail the whole
           # run. Only hand the action packages that actually exist, so an
           # in-manifest-but-unpublished image is skipped instead of breaking a
-          # scheduled cleanup. Only a definitive "package not found" (404) skips
-          # a package; any other response -- including a scope error on a
-          # limited token -- keeps it, so cleanup never silently disables
-          # itself.
+          # scheduled cleanup.
+          #
+          # A package is skipped only when the lookup BOTH failed and said so:
+          # `gh api` exits non-zero and the body names a missing package. Two
+          # traps live in those three lines. First, `errexit` is on and a bare
+          # assignment inherits its command substitution's exit status, so an
+          # unguarded `RESP="$(gh api ...)"` would kill the step on the very
+          # 404 this filter exists to absorb -- suspend `errexit` across that
+          # one expected failure and keep the status in RC. Second, gating on
+          # RC as well as the message means a successful response that merely
+          # mentions "not found" can never drop a live package, and any other
+          # failure -- a scope error on a limited token, a 5xx -- keeps the
+          # package, so cleanup never silently disables itself.
           EXISTING=()
           IFS=',' read -ra PKGS <<< "${LIST}"
           for pkg in "${PKGS[@]}"; do
+            set +e
             RESP="$(gh api "orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/${pkg}/versions" 2>&1)"
-            if printf '%s' "${RESP}" | grep -qi "package not found"; then
+            RC=$?
+            set -e
+            if [[ "${RC}" -ne 0 ]] && printf '%s' "${RESP}" | grep -qi 'not found'; then
               echo "== skipping unpublished package: ${pkg}"
             else
               EXISTING+=("${pkg}")
