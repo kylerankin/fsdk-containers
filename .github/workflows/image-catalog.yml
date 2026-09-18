@@ -16,6 +16,8 @@ on:
       - 'tests/test_catalog*.py'
       - 'tests/test_generated*.py'
       - 'tests/test_verify_contract*.py'
+      - '.github/requirements/**'
+      - '.github/workflows/image-catalog.yml'
   push:
     branches: [main]
     paths:
@@ -27,6 +29,8 @@ on:
       - 'tests/test_catalog*.py'
       - 'tests/test_generated*.py'
       - 'tests/test_verify_contract*.py'
+      - '.github/requirements/**'
+      - '.github/workflows/image-catalog.yml'
 
 permissions: {}
 
@@ -44,7 +48,7 @@ jobs:
           persist-credentials: false
 
       - name: Install python dependencies
-        run: python3 -m pip install --user --require-hashes -r .github/requirements/verify.txt
+        run: 'python3 -m pip install --user --require-hashes --only-binary=:all: -r .github/requirements/verify.txt'
 
       - name: Records are valid and describe the committed elements
         run: python3 -m unittest discover -s tests -p 'test_catalog*.py' -v
