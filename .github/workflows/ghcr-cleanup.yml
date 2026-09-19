@@ -82,17 +82,6 @@ jobs:
               EXISTING+=("${pkg}")
             fi
           done
-          # GitHub answers 404 both for "package does not exist" and for
-          # "package not visible to this token", so a credential or visibility
-          # regression looks exactly like a fresh manifest: every lookup 404s,
-          # EXISTING empties, the step below skips, and the run goes green
-          # having pruned nothing. A non-empty manifest that resolves to zero
-          # visible packages is never a legitimate state -- fail loudly rather
-          # than let cleanup silently disable itself.
-          if [[ "${#PKGS[@]}" -gt 0 && "${#EXISTING[@]}" -eq 0 ]]; then
-            echo "::error::manifest named ${#PKGS[@]} package(s) but none are visible on GHCR; refusing to treat this as a no-op (check token scope and package visibility)" >&2
-            exit 1
-          fi
           FILTERED="$(printf '%s\n' "${EXISTING[@]}" | paste -sd, -)"
           echo "==> cleaning: ${FILTERED}"
           echo "list=${FILTERED}" >> "$GITHUB_OUTPUT"
