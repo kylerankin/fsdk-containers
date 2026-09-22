@@ -241,8 +241,11 @@ workflows must absorb it rather than fail:
 
 - `ghcr-cleanup.yml` filters the candidate list to packages GHCR actually has
   before handing it to `dataaxiom/ghcr-cleanup-action`, whose lookup 404s the
-  whole run otherwise. An all-unpublished manifest yields an empty list, and
-  the `if: steps.packages.outputs.list != ''` guard makes that a clean no-op.
+  whole run otherwise. To distinguish a brand-new unpublished package from a
+  token scope/visibility regression (both return HTTP 404), it probes the
+  token's package-list permission once before the loop (projectbluefin/fsdk-containers#306).
+  An all-unpublished manifest yields an empty list, and the
+  `if: steps.packages.outputs.list != ''` guard makes that a clean no-op.
 - `vulnerability-scan.yml` treats skopeo's `manifest unknown` exactly like "no
   SBOM referrer": warn, set `found=false`, and skip the downstream steps.
 
@@ -256,27 +259,31 @@ a non-zero exit status *and* the specific diagnostic string, and fail the step
 on every other error:
 
 ```bash
+ERR="$(mktemp)"
 set +e
-RESP="$(gh api "orgs/${OWNER}/packages/container/${pkg}/versions" 2>&1)"; RC=$?
+INSPECT="$(skopeo inspect --no-tags "docker://${REF}" 2>"${ERR}")"
+RC=$?
 set -e
-if [[ "${RC}" -ne 0 ]] && printf '%s' "${RESP}" | grep -qi 'not found'; then
+if [[ "${RC}" -ne 0 ]]; then
+  if grep -qi 'manifest unknown' "${ERR}"; then
+    echo "::warning::image ${REF} is not published yet (manifest unknown) -- nothing to scan"
+    echo "found=false" >> "$GITHUB_OUTPUT"
+    exit 0
+  fi
+  echo "::error::skopeo inspect failed for ${REF}: $(cat "${ERR}")"
+  exit 1
+fi
 ```
 
-Three traps are load-bearing here, and all three shipped looking fine:
+Load-bearing details:
 
-- **`set -e` and bare assignment.** With no `local`/`declare`/`export` prefix,
-  an assignment's exit status *is* its command substitution's, so
-  `RESP="$(gh api …)"` under `set -euo pipefail` kills the step on the very 404
-  the classifier exists to absorb — before any `grep` runs. Suspend `errexit`
-  across that one expected failure and keep the status in `RC`.
 - **`jq -r '.Digest'` prints the literal string `null`** when the key is
   absent, which `[[ -z … ]]` does not catch; `${REGISTRY}/${IMAGE}@null` then
   reaches `oras discover`. Always use `.Digest // empty`.
 - **`gh api` needs a credential in scope.** `actions/checkout` runs with
   `persist-credentials: false`, and a token on a later `uses:` step is not in
   the environment of a `run:` step, so the step needs its own
-  `env: GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`. Without it every package looks
-  unpublished and cleanup silently prunes nothing forever.
+  `env: GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`.
 
 `bash -n` cannot catch any of this: it is a parser, not an evaluator, and no
 `set -e` interaction is visible to it. Prove a classifier by extracting the
