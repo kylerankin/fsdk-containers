@@ -486,7 +486,7 @@ verify:
 
         # Presence in the rootfs listing does not prove a working binary: a
         # missing shared library or interpreter shows up only on execution.
-        if ! {{sudo_cmd}} podman run --rm "$REF" -c "which which >/dev/null && echo x | xargs echo >/dev/null && awk 'BEGIN{exit 0}' && ps --version >/dev/null && tar --version >/dev/null && diff --version >/dev/null && patch --version >/dev/null && less --version >/dev/null && file --version >/dev/null && gzip --version >/dev/null && bwrap --version >/dev/null" >/dev/null; then
+        if ! {{sudo_cmd}} podman run --rm "$REF" -c "which which >/dev/null && echo x | xargs echo >/dev/null && find /usr/bin -maxdepth 0 >/dev/null && awk 'BEGIN{exit 0}' && ps --version >/dev/null && tar --version >/dev/null && diff --version >/dev/null && cmp --version >/dev/null && diff3 --version >/dev/null && patch --version >/dev/null && less --version >/dev/null && file --version >/dev/null && gzip --version >/dev/null && bwrap --version >/dev/null" >/dev/null; then
             echo "FAIL: lab-runner standard userland failed to execute"; exit 1
         fi
         echo "OK: standard userland executes successfully"
@@ -772,7 +772,7 @@ publish-podman-vm:
 # NOT distroless: a full dev-environment rootfs tarball for systemd-nspawn /
 # machinectl import-tar (see docs/skills/nspawn-machine-image.md).
 # renovate: datasource=github-tags depName=Homebrew/brew
-brew_version := "6.0.22"
+brew_version := "7.0.6"
 
 # Build the brew nspawn machine image (rootfs tarball, not OCI).
 [group('brew')]
@@ -928,6 +928,8 @@ sbom variant="base":
         -e SPDX_NAME="${SPDX_NAME}" \
         -e OUTFILE="${OUTFILE}" \
         -e GIT_SHA="${GIT_SHA}" \
+        -e FSDK_VERSION="${fsdk_version}" \
+        -e FSDK_REF="${fsdk_ref}" \
         "{{bst2_image}}" \
         bash -c '
             for attempt in 1 2 3; do
@@ -942,9 +944,26 @@ sbom variant="base":
                 --spdx-namespace "https://github.com/projectbluefin/fsdk-containers/sbom/${GIT_SHA}/${SPDX_NAME}" \
                 --spdx-creator "Tool: buildstream-sbom" \
                 --spdx-creator "Organization: projectbluefin" \
+                --spdx-creator "Organization: io.projectbluefin.fsdk.version=${FSDK_VERSION}" \
+                --spdx-creator "Organization: io.projectbluefin.fsdk.ref=${FSDK_REF}" \
                 --deps all \
                 --output "/src/${OUTFILE}"
         '
+
+    # The FSDK provenance creators above are the whole point of the SBOM being
+    # signed evidence rather than a package list (#128), and no published-image
+    # gate ever reads them back. Assert them here so a silent drop fails the
+    # job that generates the SBOM instead of shipping provenance-free.
+    jq -e --arg v "io.projectbluefin.fsdk.version=${fsdk_version}" \
+          --arg r "io.projectbluefin.fsdk.ref=${fsdk_ref}" '
+        (.creationInfo.creators // []) as $c
+        | ($c | index("Organization: " + $v)) != null
+          and ($c | index("Organization: " + $r)) != null
+    ' "${OUTFILE}" >/dev/null || {
+        echo "ERROR: ${OUTFILE} is missing io.projectbluefin.fsdk provenance in creationInfo.creators" >&2
+        exit 1
+    }
+    echo "==> FSDK provenance verified in ${OUTFILE} (version=${fsdk_version})"
 
 # Generate BuildStream-native SBOMs for all images in a single optimized container run
 [group('test')]
@@ -971,6 +990,8 @@ sboms:
         -w /src \
         -e GIT_SHA="${GIT_SHA}" \
         -e IMAGES="${IMAGES}" \
+        -e FSDK_VERSION="${fsdk_version}" \
+        -e FSDK_REF="${fsdk_ref}" \
         "{{bst2_image}}" \
         bash -c '
             for attempt in 1 2 3; do
@@ -988,7 +1009,24 @@ sboms:
                     --spdx-namespace "https://github.com/projectbluefin/fsdk-containers/sbom/${GIT_SHA}/${img}" \
                     --spdx-creator "Tool: buildstream-sbom" \
                     --spdx-creator "Organization: projectbluefin" \
+                    --spdx-creator "Organization: io.projectbluefin.fsdk.version=${FSDK_VERSION}" \
+                    --spdx-creator "Organization: io.projectbluefin.fsdk.ref=${FSDK_REF}" \
                     --deps all \
                     --output "/src/${img}.spdx.json"
             done
         '
+
+    # Same provenance assertion as `just sbom`: fail here rather than publish an
+    # SBOM whose creationInfo.creators lost the FSDK version/ref (#128).
+    for img in ${IMAGES}; do
+        jq -e --arg v "io.projectbluefin.fsdk.version=${fsdk_version}" \
+              --arg r "io.projectbluefin.fsdk.ref=${fsdk_ref}" '
+            (.creationInfo.creators // []) as $c
+            | ($c | index("Organization: " + $v)) != null
+              and ($c | index("Organization: " + $r)) != null
+        ' "${img}.spdx.json" >/dev/null || {
+            echo "ERROR: ${img}.spdx.json is missing io.projectbluefin.fsdk provenance in creationInfo.creators" >&2
+            exit 1
+        }
+    done
+    echo "==> FSDK provenance verified in all SBOMs (version=${fsdk_version})"

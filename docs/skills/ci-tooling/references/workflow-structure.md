@@ -153,6 +153,26 @@ push, sign, attest, or release step anywhere in them. Gating publication with
 an `if:` inside a shared job means one edit away from a fork PR publishing to
 GHCR; gating it by *not having the code path* does not. Keep it that way.
 
+### Test-gate coverage counts `run: just <recipe>`
+
+`tests/test_catalog_gate_coverage.py` proves every `tests/test_*.py` is really
+executed somewhere. A workflow reaches the Python suite in two ways and both
+count: spelling the `unittest discover` invocation itself, as
+`image-catalog.yml` and `skill-catalog.yml` do, or `run: just <recipe>` and
+letting the recipe spell it, as `pr-guest-contract` does with
+`just podman-vm-check`. Recipe names are resolved against the `Justfile`
+transitively across recipe dependencies, so adding a `run: just` step is a
+legitimate way to close a coverage hole — not only a literal discovery step.
+
+That model reads workflow *text* and does not evaluate a job's `if:`, so a
+recipe invoked only from a conditional job still scores as covered. Close that
+gap in `elements/targets.json` rather than in the model: `vm_guest_paths` lists
+`tests/test_donate_clanker_bootstrap.py` itself, because `pr-guest-contract` is
+the only job that runs it and that job is skipped unless `vm_guest` is
+selected. A new test module reachable only from a path-gated job needs the same
+entry, and `test_vm_guest_paths_select_every_module_its_job_runs` fails if it
+is missing.
+
 ### Automation tokens — everything that writes uses Mergeraptor
 
 Neither a push nor a PR made with the default `GITHUB_TOKEN` triggers another
@@ -211,6 +231,66 @@ publish pipeline attached with `oras discover --format json` (`.referrers[]`,
 not `.manifests[]`), pulls it, and scans that. It reports; it never gates — a
 CVE in an FSDK component is fixed by bumping FSDK, not by failing this repo.
 
+### In-manifest but not yet published
+
+A target belongs in `elements/targets.json` from the day its catalog record and
+elements land, not from its first publish — that is what makes the PR gate and
+`just changed-targets` see it at all. So there is always a window in which a
+target is canonical but GHCR has nothing under its name, and the two scheduled
+workflows must absorb it rather than fail:
+
+- `ghcr-cleanup.yml` filters the candidate list to packages GHCR actually has
+  before handing it to `dataaxiom/ghcr-cleanup-action`, whose lookup 404s the
+  whole run otherwise. To distinguish a brand-new unpublished package from a
+  token scope/visibility regression (both return HTTP 404), it probes the
+  token's package-list permission once before the loop (projectbluefin/fsdk-containers#306).
+  An all-unpublished manifest yields an empty list, and the
+  `if: steps.packages.outputs.list != ''` guard makes that a clean no-op.
+- `vulnerability-scan.yml` treats skopeo's `manifest unknown` exactly like "no
+  SBOM referrer": warn, set `found=false`, and skip the downstream steps.
+
+Both skips are **narrow on purpose, and the narrowness is the hard part.**
+Absorbing "not published yet" must never widen into absorbing "could not
+tell". A blanket `2>/dev/null … || true`, or a classifier that matches only on
+message text, converts an expired credential, a registry 5xx, a rate limit or a
+scoped-token 403 into a green job that pruned nothing and scanned nothing —
+week after week, under a warning that names the wrong cause. Require **both**
+a non-zero exit status *and* the specific diagnostic string, and fail the step
+on every other error:
+
+```bash
+ERR="$(mktemp)"
+set +e
+INSPECT="$(skopeo inspect --no-tags "docker://${REF}" 2>"${ERR}")"
+RC=$?
+set -e
+if [[ "${RC}" -ne 0 ]]; then
+  if grep -qi 'manifest unknown' "${ERR}"; then
+    echo "::warning::image ${REF} is not published yet (manifest unknown) -- nothing to scan"
+    echo "found=false" >> "$GITHUB_OUTPUT"
+    exit 0
+  fi
+  echo "::error::skopeo inspect failed for ${REF}: $(cat "${ERR}")"
+  exit 1
+fi
+```
+
+Load-bearing details:
+
+- **`jq -r '.Digest'` prints the literal string `null`** when the key is
+  absent, which `[[ -z … ]]` does not catch; `${REGISTRY}/${IMAGE}@null` then
+  reaches `oras discover`. Always use `.Digest // empty`.
+- **`gh api` needs a credential in scope.** `actions/checkout` runs with
+  `persist-credentials: false`, and a token on a later `uses:` step is not in
+  the environment of a `run:` step, so the step needs its own
+  `env: GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`.
+
+`bash -n` cannot catch any of this: it is a parser, not an evaluator, and no
+`set -e` interaction is visible to it. Prove a classifier by extracting the
+step's `run:` block from the YAML and executing it against stub binaries on
+`PATH` that reproduce each failure mode — the benign one, and at least one
+that must *not* be absorbed.
+
 ### Repository settings that make the gate real (admin, not in git)
 
 Branch protection on `main` (verify: `gh api
@@ -268,10 +348,12 @@ skipped entirely when no tags are pushed.
 
 The `podman-vm` release assets follow the same immutability shape one level
 up: there is no rolling equivalent at all (GitHub Release assets
-are inherently tied to their tag), and `just publish-podman-vm` guards
-re-uploads with a `gh release view --json assets` existence check, skipping
-an asset name that's already published on that tag instead of overwriting
-it. See [vm-podman-guest](../../vm-podman-guest/SKILL.md).
+are inherently tied to their tag), and `just publish-podman-vm` publishes
+an architecture's asset set as an all-or-nothing transaction with preflight
+size checks, cleanup of partial/orphaned sets, immutability skipping for complete
+sets, rollback on failure, and post-verification. An aggregate `verify-release`
+job enforces that both architectures publish their complete asset sets.
+See [vm-podman-guest](../../vm-podman-guest/SKILL.md).
 
 Set `fail-fast: false` on image and architecture matrices to prevent a single
 container build failure from canceling unrelated container builds.

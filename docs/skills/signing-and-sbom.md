@@ -1,7 +1,7 @@
 ---
 name: signing-and-sbom
-version: "1.1"
-last_updated: 2026-08-20
+version: "1.2"
+last_updated: 2026-09-18
 id: signing-and-sbom
 one_line_purpose: Sign published images and attach SPDX SBOMs as OCI referrers.
 entry_point: docs/skills/signing-and-sbom.md
@@ -23,6 +23,12 @@ Use this skill when auditing, debugging, or extending fsdk-containers' supply ch
 ## Context: Why Standard Scanners Fail
 Since `fsdk-containers` OCI images are strictly distroless with no package manager databases (no RPM or dpkg database present in the rootfs), standard post-build scanners like Syft or Trivy cannot accurately map the packages. They will report 0 or 1 package.
 To produce authoritative, high-integrity SBOMs, we generate them directly from BuildStream's build-graph using `buildstream-sbom`. This captures all 500+ package definitions, point-release versions, and patch levels from upstream freedesktop-sdk metadata.
+
+FSDK provenance (`io.projectbluefin.fsdk.version` / `io.projectbluefin.fsdk.ref`) is encoded into the SBOM's `creationInfo.creators` at generation time (`just sbom`/`just sboms` in the Justfile), so the signed SBOM evidences which FSDK release and junction ref it was carved from -- matching the image labels without relying on mutable OCI labels alone (#128).
+
+The FSDK version/ref travel into the bst2 container as `-e FSDK_VERSION` / `-e FSDK_REF` environment variables, never as Just `{{...}}` interpolation inside the single-quoted `bash -c` script of that `--privileged` run: the values come from the junction `ref:` line of `elements/freedesktop-sdk.bst`, which update automation rewrites.
+
+Do not revert these `--spdx-creator` lines back to graph-only output. `oci-images.yml` verifies only that an `application/vnd.spdx+json` referrer exists, never its `creationInfo.creators`, and `just sbom` is unreachable from pull-request jobs -- so two gates cover the drop instead: each recipe `jq -e`-asserts its own output before the signing job can publish it, and `tests/test_catalog_sbom_provenance.py` ratchets the flags, the assertion, and the env-var passing at pull-request time.
 
 ---
 
@@ -55,19 +61,49 @@ jq '.packages | length' base.spdx.json
 
 # 3. Check for specific FSDK components (e.g. glibc, openssl)
 jq -r '.packages[].name' base.spdx.json | grep -E "glibc|openssl"
+
+# 4. Verify FSDK provenance is attested in the SBOM (not merely a label on the
+#    image). The version/ref are encoded as SPDX creators at SBOM generation
+#    time (Justfile `sbom`/`sboms`), so the signed SBOM evidences which FSDK
+#    release and junction ref it was carved from -- matching the image labels.
+jq -r '.creationInfo.creators[] | select(test("io.projectbluefin.fsdk"))' base.spdx.json
 ```
 
-To verify a published image and its signature/attestation from the command line:
+To verify published OCI artifacts (runner and appliance images) and their signature/attestation:
 
 ```bash
-# Verify the keyless signature of an image
+# Verify the keyless signature of an image (pin to manifest digest)
 cosign verify \
   --certificate-identity-regexp="https://github.com/projectbluefin/fsdk-containers/.github/workflows/" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
   ghcr.io/projectbluefin/base:26.08
+  # Or with digest: ghcr.io/projectbluefin/base@sha256:<digest>
 
-# Discover and retrieve the attached SBOM
+# Discover and retrieve the attached SPDX SBOM referrer
 oras discover ghcr.io/projectbluefin/base:26.08
+
+# Verify GitHub provenance attestation for the OCI image
+gh attestation verify oci://ghcr.io/projectbluefin/base:26.08 \
+  -R projectbluefin/fsdk-containers \
+  --signer-repo projectbluefin/fsdk-containers
+```
+
+To verify published VM guest release artifacts (`podman-vm`):
+
+```bash
+# 1. Verify download integrity via SHA256 checksum sidecar
+sha256sum -c donate-clanker-vm-26.08-x86_64.raw.zst.sha256
+
+# 2. Decompress and verify uncompressed disk integrity
+zstd -d --keep donate-clanker-vm-26.08-x86_64.raw.zst
+sha256sum -c donate-clanker-vm-26.08-x86_64.raw.sha256
+
+# 3. Verify cryptographic authenticity and build provenance (via GitHub Attestations)
+# Note: Checksum sidecars verify download integrity but zero authenticity.
+# Authenticity must be verified using GitHub Artifact Attestations:
+gh attestation verify donate-clanker-vm-26.08-x86_64.raw.zst \
+  -R projectbluefin/fsdk-containers \
+  --signer-repo projectbluefin/fsdk-containers
 ```
 
 ---
@@ -149,7 +185,12 @@ not a scanner quirk.
   registry-referrer/`--bundle-from-oci` path is lost. The SPDX SBOM referrer
   has no such limit: plain `oras attach` + `cosign sign` loops in shell.
 - **The VM guest disk has no registry**, so it uses `actions/attest` with
-  `subject-path` (glob over `.raw`/`.qcow2`) and `push-to-registry: false`,
+  `subject-path` (glob over `.raw`/`.qcow2`/`.raw.zst`/`.qcow2.zst`) and `push-to-registry: false`,
   plus a second call with `sbom-path` for the SPDX file — per arch, matching
   the independent-per-arch publication pattern.
+  Consumers verify the downloaded asset file with
+  `gh attestation verify <asset-file> -R projectbluefin/fsdk-containers --signer-repo projectbluefin/fsdk-containers`.
+  Note that `subject-path` attests both uncompressed and compressed disks, but only
+  compressed `.zst` files, checksum sidecars, and SPDX SBOMs are published to GitHub Releases
+  because uncompressed disks exceed GitHub's 2 GiB per-asset limit.
 
