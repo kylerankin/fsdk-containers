@@ -65,7 +65,6 @@ this markdown is the contract and the Justfile loops are the enforcement.
   tool is not in the stack.
 - A `--version`-only probe for a tool with pluggable back-ends (compressors,
   sandboxing) — probe the operation end to end (#87, #109).
-- Raising the 640 MiB ceiling without a measured size in the PR body.
 
 ## Verification
 

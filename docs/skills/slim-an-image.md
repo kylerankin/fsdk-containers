@@ -316,5 +316,6 @@ cut that must stay gone, so it fails the build if it creeps back.
 
 ## Reference result
 
-`base`: ~73 MB rootfs → **~45 MB image** after slim (enforced ceiling: 64 MiB
-uncompressed in `just verify`), all gates green.
+`base`: ~73 MB rootfs → **~45 MB image** after slim (measured with
+`podman image inspect .Size`), all gates green.
+

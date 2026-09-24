@@ -39,10 +39,10 @@ metadata:
 
 ## 2. The Verification Gates
 
-`just verify` is the merge contract. Every OCI image must pass a per-image size
-ceiling, the gates below, and — for images that ship a real binary — a smoke
-test that executes it (`base`/`static` get their `/usr/bin/true` smoke only in
-the post-publish `publish-smoke` job).
+`just verify` is the merge contract. Every OCI image must pass the gates below
+and — for images that ship a real binary — a smoke test that executes it
+(`base`/`static` get their `/usr/bin/true` smoke only in the post-publish
+`publish-smoke` job).
 
 Distroless images (all except `lab-runner`):
 
