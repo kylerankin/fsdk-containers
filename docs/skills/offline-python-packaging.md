@@ -9,7 +9,7 @@ category: ci-ops
 mcp_compliance_level: partial
 optimization_status: draft
 status: active
-dependencies: [remote-execution, add-new-image, verify-distroless]
+dependencies: [add-new-image, verify-distroless]
 tags: [python, pyproject, cargo2, pypi, offline, source-plugin, catalog]
 description: "Recipe for the buildstream-plugins-community pyproject element: element shape, sha256 refs from PyPI, the FSDK-first dependency rule, the build-args-local trap, wheel-only upstreams via the core remote source, and Rust extensions via cargo2."
 metadata:
@@ -29,7 +29,7 @@ them as measured.
 
 ## The constraint that shapes everything
 
-The build phase has no network ([`remote-execution.md`](remote-execution.md)),
+The build phase has no network,
 so `pip install` is unavailable and **there is no dependency resolver at all**.
 You declare the transitive closure yourself, one element per distribution —
 the per-image cost issue #113 exists to drive down, not overhead you can skip.

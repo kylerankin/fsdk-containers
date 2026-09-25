@@ -1,4 +1,4 @@
-# BuildStream — Overlaps and Remote-Sandbox Constraints
+# BuildStream — Overlaps and Sandbox Constraints
 
 Detail referenced from [`../SKILL.md`](../SKILL.md). Read the skill first.
 
@@ -23,10 +23,9 @@ phase. Then assert the result on the composed image, because a silent flip is
 otherwise invisible. This shipped as a real regression in dakota (zram config
 whitelisted but overwritten by the junction, dakota#1131).
 
-## Remote-sandbox constraints
+## Sandbox constraints
 
-Builds run on BuildBarn workers, not on your machine. Two patterns that work
-locally and fail remotely:
+Two sandbox patterns to know:
 
 - **Never use `/dev/stdin` redirection.** `install -Dm644 /dev/stdin ... <<'EOF'`
   fails in sandboxes that do not mount `/proc`. Write inline files in two steps:
@@ -37,4 +36,4 @@ locally and fail remotely:
 - **Go builds need an explicit `GOROOT`.** The FSDK Go toolchain installs its
   standard library under `%{libdir}/go`, and dependent elements do not inherit
   `GOROOT_BOOTSTRAP`. Set `GOROOT: "%{libdir}/go"` in any element invoking
-  `go build`, or remote actions fail with `go: cannot find GOROOT directory`.
+  `go build`, or actions fail with `go: cannot find GOROOT directory`.

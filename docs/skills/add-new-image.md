@@ -49,6 +49,16 @@ If the image needs something the record cannot express, that is a gap in
 `catalog/schema.json`. Extend the schema and the generator so the next image
 gets it for free — do not work around it with a bespoke element.
 
+`image_paths` must also cover local elements reachable through the new image's
+`stack.depends`, including transitive dependencies. For example, `review-runtime`
+depends on `node/node-stack.bst`, which depends on `node/node.bst`, so its paths
+include `elements/node/`; otherwise a node change selects no `review-runtime`
+build in `just changed-targets`. The one exemption is `elements/base/`: every image
+depends on it, and changes there select the `base` canary. Any other published
+image's stack you depend on (e.g. `lab-runner` → `skopeo/skopeo-stack.bst`) needs
+its directory listed too; otherwise a change there builds only the owning image.
+Junction changes are covered by `shared_paths`.
+
 ## Catalog conventions
 
 - `stack.depends` is an ordered list. Its order is load-bearing because it
