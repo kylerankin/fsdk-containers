@@ -199,9 +199,20 @@ skill-catalog-check:
 track *ELEMENTS:
     #!/usr/bin/env bash
     set -euo pipefail
-    for arch in x86_64 aarch64; do
-        just bst -o arch "${arch}" source track {{ELEMENTS}}
+    # Arch-independent sources resolve one ref per arch; track them once.
+    # Arch-conditional sources (kind:remote per-arch downloads) need a second
+    # aarch64 track or one ref goes stale -- see check_multiarch_refs parity.
+    just bst -o arch x86_64 source track {{ELEMENTS}}
+    arch_dependent=()
+    for e in {{ELEMENTS}}; do
+        if grep -qE 'arch[[:space:]]*==' "elements/$e"; then
+            arch_dependent+=("$e")
+        fi
     done
+    if [ "${#arch_dependent[@]}" -gt 0 ]; then
+        # shellcheck disable=SC2086,SC2068  # word/array splitting intended
+        just bst -o arch aarch64 source track ${arch_dependent[@]}
+    fi
 
 # Check that multi-arch element source refs were updated symmetrically.
 # Usage: just check-refs [BASE]
