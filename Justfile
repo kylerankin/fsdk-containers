@@ -194,7 +194,7 @@ skill-catalog-check:
     python3 -m unittest discover -s tests -p 'test_skill_index*.py' -v
 
 # Track source references: x86_64 first, then aarch64 for arch-conditional elements.
-# Usage: just track elements/lab-runner/kubectl.bst
+# Usage: just track lab-runner/kubectl.bst
 [group('dev')]
 track *ELEMENTS:
     #!/usr/bin/env bash
