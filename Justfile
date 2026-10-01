@@ -193,7 +193,7 @@ skill-catalog-check:
     python3 scripts/generate_skill_index.py --check
     python3 -m unittest discover -s tests -p 'test_skill_index*.py' -v
 
-# Track source references across all supported architectures (x86_64 and aarch64).
+# Track source references: x86_64 first, then aarch64 for arch-conditional elements.
 # Usage: just track elements/lab-runner/kubectl.bst
 [group('dev')]
 track *ELEMENTS:
@@ -205,13 +205,21 @@ track *ELEMENTS:
     just bst -o arch x86_64 source track {{ELEMENTS}}
     arch_dependent=()
     for e in {{ELEMENTS}}; do
-        if grep -qE 'arch[[:space:]]*==' "elements/$e"; then
+        # Elements are addressable either way (`lab-runner/kubectl.bst` or
+        # `elements/lab-runner/kubectl.bst`); normalise before reading the
+        # file, and fail loudly rather than misclassify a path we cannot read.
+        f="elements/${e#elements/}"
+        if [ ! -f "${f}" ]; then
+            echo "track: no such element file: ${f}" >&2
+            exit 1
+        fi
+        # Any `arch` conditional (==, !=, in) makes the refs arch-dependent.
+        if grep -qE '\barch[[:space:]]*(==|!=)|\barch[[:space:]]+in[[:space:]]' "${f}"; then
             arch_dependent+=("$e")
         fi
     done
     if [ "${#arch_dependent[@]}" -gt 0 ]; then
-        # shellcheck disable=SC2086,SC2068  # word/array splitting intended
-        just bst -o arch aarch64 source track ${arch_dependent[@]}
+        just bst -o arch aarch64 source track "${arch_dependent[@]}"
     fi
 
 # Check that multi-arch element source refs were updated symmetrically.
