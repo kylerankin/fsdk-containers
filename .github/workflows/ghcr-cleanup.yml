@@ -6,8 +6,8 @@ name: GHCR cleanup
 # covers the bluefin, dakota and common families only, so nothing here was
 # ever pruned.
 #
-# Untagged manifests ONLY -- with one tagged exception, `:latest` (see the
-# "Delete stale :latest tags" step below, issue #364). FSDK point-release
+# Untagged manifests ONLY -- the tagged exceptions (:latest and
+# printing-base-devel) are handled in their own steps below (issue #364). FSDK point-release
 # tags are immutable by contract
 # (docs/skills/container-standards.md): a consumer pinned to :25.08.13 must
 # still be able to pull it, so this never uses keep-n-tagged -- which is also
@@ -15,7 +15,7 @@ name: GHCR cleanup
 # projectbluefin/actions composite, whose keep-n-tagged default would prune
 # published point releases.
 #
-# The one exception is printing-base-devel (printing-base.yml): a build-time
+# printing-base-devel (printing-base.yml) is the other exception: a build-time
 # BuildStream cache bundle, not an image anyone pins. Its keyed
 # `<arch>-<full-key>` tags are superseded by every printing/base.bst change,
 # so the last 5 per architecture are kept and older ones pruned below.
@@ -124,12 +124,13 @@ jobs:
 
       # #23 stopped publishing :latest, but the pre-#23 tags were never
       # removed, so they still resolve to frozen July images (issue #364).
-      # The untagged prune above never touches them (ghcr-cleanup excludes
-      # *-latest by contract), so reap them here: delete the bare :latest from
-      # every published package so unpinned consumers fail loudly instead of
+      # The untagged prune below never touches them -- it deletes only
+      # untagged manifests, and :latest is a tagged manifest, so it survives
+      # on its own -- so reap them here: delete the bare :latest from every
+      # published package so unpinned consumers fail loudly instead of
       # silently pulling a two-month-old image.
       #
-      # Uses the same dataaxiom action as the untagged prune (pinned above),
+      # Uses the same dataaxiom action as the untagged prune (pinned below),
       # not crane: a bare `crane tags list`/`crane delete` cannot operate on
       # GHCR (deleting a tag returns 405 UNSUPPORTED, and crane reads neither
       # GH_TOKEN nor GITHUB_TOKEN, so it had no credential here anyway), and
