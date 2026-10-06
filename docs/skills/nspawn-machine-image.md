@@ -97,8 +97,9 @@ entries, `etc/locale.conf`, `etc/machine-id`, and the app user at uid 1001
 (path presence only — it does not resolve the `./usr/bin/init` symlink
 target). The element's `brew-version` variable must stay in lockstep with the
 Justfile's `brew_version` (both carry the same `renovate` annotation) —
-verify-brew builds the expected tarball name from it. The
-scheduled/on-demand `.github/workflows/brew-nspawn.yml` job runs this check
-on a native Ubuntu runner; nothing publishes the tarball yet. Booting
+verify-brew builds the expected tarball name from it. The `brew-nspawn.yml` job runs this check on a native Ubuntu runner; nothing
+publishes the tarball. It runs on a weekly schedule and on demand, and on
+pull requests that change brew (a `paths:` filter), so element edits are
+exercised in CI rather than only on the weekly schedule -- see issue #390. Booting
 (`machinectl import-tar` + `machinectl start`) requires a systemd host and
 remains a separate integration step.
