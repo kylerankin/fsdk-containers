@@ -11,12 +11,14 @@ on:
   workflow_dispatch:
   # Exercise the brew element on pull requests (issue #390). Gated by `paths:`
   # so an unrelated PR -- one that never touches brew -- stays cheap and skips
-  # the heavy build entirely; a change to a brew element or its recipe runs it.
+  # the heavy build entirely; a change to a brew element, its recipe, or this
+  # workflow file itself runs it.
   pull_request:
     paths:
       - elements/brew/**
       - elements/oci/brew-nspawn.bst
       - Justfile
+      - .github/workflows/brew-nspawn.yml
 
 concurrency:
   group: brew-nspawn-${{ github.ref }}
