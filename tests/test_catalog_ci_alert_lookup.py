@@ -17,7 +17,6 @@ FAKE_GH = r'''#!/usr/bin/env python3
 import json
 import os
 from pathlib import Path
-import subprocess
 import sys
 
 args = sys.argv[1:]
@@ -25,9 +24,11 @@ fixture = json.loads(Path(os.environ["ALERT_FIXTURE"]).read_text())
 with open(os.environ["ALERT_CALLS"], "a") as log:
     log.write(json.dumps(args) + "\n")
 if args[0] == "api":
+    if "--slurp" in args and ("--jq" in args or "--template" in args):
+        raise SystemExit("the --slurp option is not supported with --jq or --template")
     if fixture.get("api_error"):
         if fixture["api_error"] == "partial":
-            print("336")
+            print(json.dumps([[{"number": 336, "title": "[CI] Build images failed on main", "state": "closed"}]]))
         sys.exit(1)
     endpoint = next(arg for arg in args if arg.startswith("repos/"))
     assert endpoint.startswith("repos/projectbluefin/fsdk-containers/issues?")
@@ -37,13 +38,8 @@ if args[0] == "api":
     if "--paginate" not in args:
         pages = pages[:1]
     data = pages if "--slurp" in args else pages[0]
-    result = subprocess.run(
-        ["jq", "-r", args[args.index("--jq") + 1]],
-        input=json.dumps(data), text=True, capture_output=True,
-    )
-    sys.stdout.write(result.stdout)
-    sys.stderr.write(result.stderr)
-    sys.exit(result.returncode)
+    print(json.dumps(data))
+    sys.exit(0)
 if args[:2] in (["issue", "create"], ["issue", "reopen"], ["issue", "edit"]):
     sys.exit(0)
 raise SystemExit("Unexpected gh invocation: " + repr(args))

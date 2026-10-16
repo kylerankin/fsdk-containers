@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
           ISSUE_NUM=$(gh api --paginate --slurp \
             "repos/${{ github.repository }}/issues?state=all&per_page=100" \
-            --jq '[.[][] | select(.pull_request == null and .title == "[CI] Build images failed on main")]
+            | jq -r '[.[][] | select(.pull_request == null and .title == "[CI] Build images failed on main")]
                   | if length > 1 then error("Multiple CI alert issues match; refusing to select one")
                     else .[0].number // empty end')
           echo "issue_number=${ISSUE_NUM:-}" >> "$GITHUB_OUTPUT"
