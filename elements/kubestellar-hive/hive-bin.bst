@@ -24,11 +24,13 @@ description: |
   the generated plugin manifest cannot represent this Go 1.25 dependency
   graph's indirect requirements reliably.
 
-  BUILD STATUS (2026-08-24): a full `just bst build
+  BUILD STATUS (2026-08-24): a full `BST_LOCAL=1 just bst build
   kubestellar-hive/hive-bin.bst` in the bst2 container succeeded offline and
   produced usr/bin/hive, usr/bin/bd, and usr/bin/hive-backup. Captured during
-  the #146 spike before remote execution was retired; the current model builds
-  locally in the bst2 container, so no grid kubeconfig is required.
+  the #146 spike, when `just bst` defaulted to the BuildBarn grid and
+  BST_LOCAL=1 forced a local run; remote execution has since been retired and
+  the current model builds locally in the bst2 container, so no grid
+  kubeconfig is required.
 
   TWO NON-OBVIOUS WRINKLES Wave 1/4 must know:
   1. go_module.track() (BST_REQUIRES_PREVIOUS_SOURCES_STAGE) reads go.mod and

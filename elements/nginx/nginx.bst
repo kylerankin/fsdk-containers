@@ -34,8 +34,9 @@ description: |
      nginx_version variable below (Renovate proposes bumps), not a value
      frozen in this comment. This spike element predates the published
      lab-runner/nginx.bst (which moved to 1.31.4 in #172) and is kept only as
-     a spike record; re-verify the tarball sha256 live before trusting the
-     ref: here.
+     a spike record. The ref under sources: is re-tracked automatically on
+     Renovate bumps; re-verify the tarball sha256 manually only when
+     nginx_version is edited by hand.
 
 sources:
 - kind: tar

@@ -66,10 +66,12 @@ description: |
     sandbox), NOT an element error.
   - kubestellar-hive/hive-bin.bst (2026-08-24): all 24 module refs resolve
     from the pinned afb7fa6 anchors, and an authoritative `go mod vendor`
-    modules.txt is staged. A full `just bst build` in the bst2 container
-    succeeded offline and its artifact contains usr/bin/hive, usr/bin/bd, and
-    usr/bin/hive-backup. This spike-era note predates the retirement of remote
-    execution; the current model builds locally in the bst2 container.
+    modules.txt is staged. A full `BST_LOCAL=1 just bst build` in the bst2
+    container succeeded offline and its artifact contains usr/bin/hive,
+    usr/bin/bd, and usr/bin/hive-backup (BST_LOCAL=1 was needed then because
+    `just bst` defaulted to the grid). This spike-era note predates the
+    retirement of remote execution; the current model builds locally in the
+    bst2 container.
 
 depends:
   - base/base-stack.bst
