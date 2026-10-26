@@ -27,9 +27,9 @@ description: |
      shared libraries: libcrypt.so.2"), bootstrap/pcre2,
      components/openssl, components/zlib. The stack
      (nginx-stack.bst) composes this on base/base-stack.bst.
-  3. Resolves: yes — `just bst build elements/nginx/nginx-stack.bst` in the
-     bst2 container succeeded on 2026-08-20. (This spike-era note predates the
-     retirement of remote execution; the current model builds locally.)
+  3. Resolves: yes — `just bst build elements/nginx/nginx-stack.bst`
+     succeeded on 2026-08-20 on the now-retired BuildBarn grid; the current
+     model builds locally in the bst2 container.
   4. Upstream version + ref: the source version is the tracked
      nginx_version variable below (Renovate proposes bumps), not a value
      frozen in this comment. This spike element predates the published
@@ -40,9 +40,9 @@ description: |
 sources:
 - kind: tar
   url: https://nginx.org/download/nginx-%{nginx_version}.tar.gz
-    # sha256 for the pinned ref is re-verified live before a bump; the
-    # nginx_version variable owns the version, so this note is not re-pinned
-    # by Renovate (see the ref: line above).
+    # Version comes from %{nginx_version}; Renovate bumps both the variable
+    # and this ref together (the ref is re-tracked in the same PR by
+    # .github/workflows/refresh-bst-refs.yml).
   ref: 0652b760b3b772d2ec17b47c2fc15d9a95e6fe35cd5b877eadc1a62d9bc75af1
 
 build-depends:
@@ -70,7 +70,8 @@ build-depends:
 # libxcrypt is REQUIRED, not optional: components/gcc.bst runtime-depends on
 # bootstrap/libxcrypt.bst, so libcrypt.so.2 is staged in the build sandbox,
 # nginx's configure finds crypt(), and the binary ends up with
-# NEEDED libcrypt.so.2 (verified via readelf on the grid-built artifact).
+# NEEDED libcrypt.so.2 (verified via readelf on the spike-era,
+# grid-built artifact).
 # Without this dep the image's nginx fails at startup with
 # "error while loading shared libraries: libcrypt.so.2".
 depends:

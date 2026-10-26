@@ -39,10 +39,10 @@ description: |
   WHAT THIS STACK CONTAINS (draft): the Go binaries via hive-bin.bst
   (fully tracked and locally buildable with go_module) and the ttyd chain
   (libwebsockets.bst + ttyd.bst — buildable from FSDK components).
-  What it CANNOT contain on today's grid: the Node dashboard proxy —
+  What it CANNOT contain today: the Node dashboard proxy —
   FSDK has NO node component (checked components/ at the pinned junction
   ref), buildstream-plugins-community 2.3.1 has NO npm source plugin, and
-  the RE grid build phase has NO network, so `npm install express
+  the bst build sandbox has NO network, so `npm install express
   http-proxy-middleware` cannot run and no vendored node_modules tarball
   exists upstream. Wave 4 options: (a) upstream publishes a vendored
   node_modules tarball; (b) hand-declare the npm tree as tarball sources
@@ -67,7 +67,7 @@ description: |
   - kubestellar-hive/hive-bin.bst (2026-08-24): all 24 module refs resolve
     from the pinned afb7fa6 anchors, and an authoritative `go mod vendor`
     modules.txt is staged. A full `just bst build` in the bst2 container
-    succeeded and its artifact contains usr/bin/hive, usr/bin/bd, and
+    succeeded offline and its artifact contains usr/bin/hive, usr/bin/bd, and
     usr/bin/hive-backup. This spike-era note predates the retirement of remote
     execution; the current model builds locally in the bst2 container.
 
