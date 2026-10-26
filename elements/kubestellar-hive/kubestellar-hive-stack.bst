@@ -52,7 +52,8 @@ description: |
   proxy is a thin auth shim; dropping it changes auth behavior, needs
   upstream discussion).
 
-  MEASURED BUILD STATUS (2026-08-09, ghost BuildBarn grid):
+  MEASURED BUILD STATUS (2026-08-09, #146 spike, on the now-retired BuildBarn
+  grid — remote execution was later replaced by local bst2 container builds):
   - kubestellar-hive/ttyd.bst (+ libwebsockets.bst): full graph RESOLVES
     (`bst show` SUCCESS), proving cmake/ninja/gcc/json-c/openssl/zlib all
     exist in FSDK at the pinned junction ref. `bst build ttyd.bst` got as
@@ -62,14 +63,13 @@ description: |
         Shard 1: error reading from server: connection reset by peer
     Deterministic across two runs (same blob) — grid storage shard issue
     (ctest.debug belongs to cmake's debug split staged into the build
-    sandbox), NOT an element error. Retry when the grid CAS is healthy.
+    sandbox), NOT an element error.
   - kubestellar-hive/hive-bin.bst (2026-08-24): all 24 module refs resolve
     from the pinned afb7fa6 anchors, and an authoritative `go mod vendor`
-    modules.txt is staged. A full offline `BST_LOCAL=1 just bst build`
+    modules.txt is staged. A full `just bst build` in the bst2 container
     succeeded and its artifact contains usr/bin/hive, usr/bin/bd, and
-    usr/bin/hive-backup. This is degraded local evidence only: the test
-    environment lacked both the ghost-grid kubeconfig and kubectl, so #146's
-    grid-build criterion still needs to be rerun where the grid is available.
+    usr/bin/hive-backup. This spike-era note predates the retirement of remote
+    execution; the current model builds locally in the bst2 container.
 
 depends:
   - base/base-stack.bst

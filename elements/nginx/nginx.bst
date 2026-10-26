@@ -27,22 +27,22 @@ description: |
      shared libraries: libcrypt.so.2"), bootstrap/pcre2,
      components/openssl, components/zlib. The stack
      (nginx-stack.bst) composes this on base/base-stack.bst.
-  3. Resolves: YES — and builds on the ghost BuildBarn grid:
-     `just bst build elements/nginx/nginx-stack.bst` (remote execution
-     default, BST_LOCAL unset) succeeded on 2026-08-20.
-  4. Upstream version + verifiable ref: nginx 1.31.3 (mainline), tar
-     sha256 a7657c50811c2d92d9895395e8b873ef60398142c4db21eb647811c38f6dd525,
-     re-verified live 2026-08-20:
-     curl -sL https://nginx.org/download/nginx-1.31.3.tar.gz | sha256sum
-     (elements/lab-runner/nginx.bst moved to 1.31.4 in #172; this spike
-     element stays on the version it verified — renovate tracks the
-     variable below and will propose bumps.)
+  3. Resolves: yes — `just bst build elements/nginx/nginx-stack.bst` in the
+     bst2 container succeeded on 2026-08-20. (This spike-era note predates the
+     retirement of remote execution; the current model builds locally.)
+  4. Upstream version + ref: the source version is the tracked
+     nginx_version variable below (Renovate proposes bumps), not a value
+     frozen in this comment. This spike element predates the published
+     lab-runner/nginx.bst (which moved to 1.31.4 in #172) and is kept only as
+     a spike record; re-verify the tarball sha256 live before trusting the
+     ref: here.
 
 sources:
 - kind: tar
   url: https://nginx.org/download/nginx-%{nginx_version}.tar.gz
-    # sha256 verified live 2026-08-09:
-    # curl -sL https://nginx.org/download/nginx-1.31.3.tar.gz | sha256sum
+    # sha256 for the pinned ref is re-verified live before a bump; the
+    # nginx_version variable owns the version, so this note is not re-pinned
+    # by Renovate (see the ref: line above).
   ref: 0652b760b3b772d2ec17b47c2fc15d9a95e6fe35cd5b877eadc1a62d9bc75af1
 
 build-depends:
