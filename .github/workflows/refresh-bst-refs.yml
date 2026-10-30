@@ -61,7 +61,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2
+        with:
+          tool: just
 
       - name: Determine changed elements
         id: changed
@@ -156,6 +158,8 @@ jobs:
         with:
           app-id: ${{ secrets.MERGERAPTOR_APP_ID }}
           private-key: ${{ secrets.MERGERAPTOR_PRIVATE_KEY }}
+          # The token only pushes refreshed .bst refs onto the Renovate branch.
+          permission-contents: write
 
       - name: Commit and push refreshed refs
         if: steps.diff.outputs.changed == 'true'
